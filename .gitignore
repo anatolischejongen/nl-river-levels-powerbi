@@ -216,3 +216,5 @@ data/raw/*
 
 # Ignore temporary pbi files ,only pbix
 *.pbixLock
+# Python Sanal Ortami
+.venv/

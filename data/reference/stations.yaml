@@ -1,0 +1,101 @@
+# =============================================================================
+# Dutch River Water Level Monitoring Stations
+# =============================================================================
+# This file defines the 13 Rijkswaterstaat measurement stations selected for
+# the project. Each entry corresponds to a real WATHTE (Waterhoogte) station
+# that returns water level readings via the OphalenWaarnemingen API.
+#
+# Selection criteria:
+#   - Active station (last measurement within the last few weeks)
+#   - Located on the main river course (not canals, harbors, or side channels)
+#   - Compartiment: OW (Oppervlaktewater = surface water)
+#   - Hoedanigheid: NAP (referenced to Normaal Amsterdams Peil)
+#
+# Coverage: 5 rivers across the Netherlands (Bovenrijn, Nederrijn, Waal,
+# IJssel, Maas), spanning ~300 km from south to north.
+# =============================================================================
+
+stations:
+
+  # ---------- Bovenrijn (Upper Rhine, where Rhine enters NL from Germany) ----------
+  - code: lobith.bovenrijn.tolkamer
+    name: Lobith Tolkamer
+    river: Bovenrijn
+    region: Gelderland
+    notes: International border crossing, primary inflow point of the Rhine into NL
+
+  # ---------- Nederrijn (Rhine arm flowing through Arnhem) ----------
+  - code: arnhem.nederrijn
+    name: Arnhem
+    river: Nederrijn
+    region: Gelderland
+    notes: Where the Nederrijn arm passes through Arnhem city
+
+  # ---------- Waal (largest Rhine distributary, southern arm) ----------
+  - code: nijmegen.waal
+    name: Nijmegen
+    river: Waal
+    region: Gelderland
+    notes: Main Waal channel at Nijmegen
+
+  - code: tiel.waal
+    name: Tiel
+    river: Waal
+    region: Gelderland
+    notes: Waal at Tiel; tiel.sluis.waal stopped reporting Feb 2026
+
+  # ---------- IJssel (northern Rhine arm, flows to IJsselmeer) ----------
+  - code: zutphen.ijssel
+    name: Zutphen
+    river: IJssel
+    region: Gelderland
+    notes: Upper IJssel section
+
+  - code: deventer
+    name: Deventer
+    river: IJssel
+    region: Overijssel
+    notes: Mid IJssel section
+
+  - code: olst
+    name: Olst
+    river: IJssel
+    region: Overijssel
+    notes: Mid-northern IJssel section
+
+  - code: zwolle.ijssel
+    name: Zwolle
+    river: IJssel
+    region: Overijssel
+    notes: Northern IJssel section near Zwartewater confluence
+
+  - code: kampen.ijssel
+    name: Kampen
+    river: IJssel
+    region: Overijssel
+    notes: IJssel mouth, just before discharging into IJsselmeer
+
+  # ---------- Maas (Meuse, separate river from Rhine system) ----------
+  - code: maastricht.borgharen.maas.beneden
+    name: Borgharen (downstream of stuw)
+    river: Maas
+    region: Limburg
+    notes: Just below Borgharen weir, near Belgian border
+
+  - code: roermond.boven
+    name: Roermond (upstream of stuw)
+    river: Maas
+    region: Limburg
+    notes: Above Roermond weir; roermond.beneden inactive since 1995
+
+  - code: venlo
+    name: Venlo
+    river: Maas
+    region: Limburg
+    notes: Mid Maas section in Limburg
+
+  - code: grave.beneden
+    name: Grave (downstream of stuw)
+    river: Maas
+    region: Noord-Brabant
+    notes: Below Grave weir, near Maas-Waal junction
