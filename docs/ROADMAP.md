@@ -82,14 +82,14 @@ Power BI Service (published, public link) -->
 - [x] `data/reference/stations.yaml` written and validated
 - [x] `requirements.txt` created
 
-#### Phase 2 — Multi-station fetch 🔵
-- [ ] 2.1 — `stations.yaml` config ✅
-- [ ] 2.2 — Refactor: extract reusable module `rws_api.py`
-- [ ] 2.3 — Loop over 13 stations (7 days first)
-- [ ] 2.4 — Apply parser to each station's response
-- [ ] 2.5 — Add rate limiting (politeness toward API)
-- [ ] 2.6 — Error handling: one failure shouldn't stop the loop
-- [ ] 2.7 — Progress indicator
+#### Phase 2 — Multi-station fetch ✅
+- [x] 2.1 — `stations.yaml` config 
+- [x] 2.2 — Refactor: extract reusable module `rws_api.py`
+- [x] 2.3 — Loop over 13 stations (7 days first)
+- [x] 2.4 — Apply parser to each station's response
+- [x] 2.5 — Add rate limiting (politeness toward API)
+- [x] 2.6 — Error handling: one failure shouldn't stop the loop
+- [x] 2.7 — Progress indicator
 
 #### Phase 3 — CSV intermediate layer
 - [ ] 3.1 — Convert parser output to `pandas.DataFrame`
