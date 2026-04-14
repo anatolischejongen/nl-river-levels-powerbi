@@ -91,12 +91,12 @@ Power BI Service (published, public link) -->
 - [x] 2.6 — Error handling: one failure shouldn't stop the loop
 - [x] 2.7 — Progress indicator
 
-#### Phase 3 — CSV intermediate layer
-- [ ] 3.1 — Convert parser output to `pandas.DataFrame`
-- [ ] 3.2 — Save as `data/raw/water_levels_7days.csv`
-- [ ] 3.3 — Visual inspection in Excel
-- [ ] 3.4 — Add `data/raw/*` to `.gitignore`
-- [ ] 3.5 — Create `data/sample/sample.csv` (first 100 rows, committed)
+#### Phase 3 — CSV intermediate layer ✅
+- [x] 3.1 — Convert parser output to `pandas.DataFrame`
+- [x] 3.2 — Save as `data/raw/water_levels_7days.csv`
+- [x] 3.3 — Visual inspection in Excel
+- [x] 3.4 — Add `data/raw/*` to `.gitignore`
+- [x] 3.5 — Create `data/sample/sample.csv` (first 100 rows, committed)
 
 #### Phase 4 — Historical data (3 years)
 - [ ] 4.1 — Extend time range from 7 days → 3 years
@@ -266,11 +266,11 @@ Een gepubliceerd Power BI-dashboard bouwen dat waterstanden volgt over **5 Neder
 | 0 | Repo-skelet & mappenstructuur | ✅ Klaar |
 | 1 | API-verbinding & eerste succesvolle fetch | ✅ Klaar |
 | 1.5 | Stationselectie (13 stations, 5 rivieren) | ✅ Klaar |
-| 2 | Multi-station fetch met gedeelde module | 🔵 Bezig |
-| 3 | CSV-tussenlaag | ⬜ Gepland |
-| 4 | Opschalen naar 3 jaar historische data | ⬜ Gepland |
-| 5 | Supabase opzet & schema-ontwerp | ⬜ Gepland |
-| 6 | CSV → Postgres laden | ⬜ Gepland |
+| 2 | Multi-station fetch met gedeelde module | ✅ Klaar  |
+| 3 | CSV-tussenlaag | ✅ Klaar  |
+| 4 | Opschalen naar 3 jaar historische data | 🔵 Bezig |
+| 5 | Supabase opzet & schema-ontwerp | 🔵 Bezig |
+| 6 | CSV → Postgres laden | 🔵 Bezig |
 | 7 | Power BI-verbinding | ⬜ Gepland |
 | 8 | DAX-maten & datamodel | ⬜ Gepland |
 | 9 | Drempelwaarden onderzoek (grootste risico) | ⬜ Gepland |
