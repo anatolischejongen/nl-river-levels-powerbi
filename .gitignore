@@ -160,7 +160,6 @@ celerybeat.pid
 .vscode/
 .idea/
 *.swp
-EOF
 .spyderproject
 .spyproject
 .ropeproject

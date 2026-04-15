@@ -1,0 +1,14 @@
+station_code,station_name,river,actual_meting,expected,coverage_pct
+tiel.waal,Tiel,Waal,4572,170784,2.7
+arnhem.nederrijn,Arnhem,Nederrijn,174525,170784,102.2
+zutphen.ijssel,Zutphen,IJssel,174968,170784,102.4
+zwolle.ijssel,Zwolle,IJssel,174968,170784,102.4
+lobith.bovenrijn.tolkamer,Lobith Tolkamer,Bovenrijn,175044,170784,102.5
+nijmegen.waal,Nijmegen,Waal,174989,170784,102.5
+deventer,Deventer,IJssel,174976,170784,102.5
+olst,Olst,IJssel,174987,170784,102.5
+kampen.ijssel,Kampen,IJssel,174996,170784,102.5
+maastricht.borgharen.maas.beneden,Borgharen (downstream of stuw),Maas,175034,170784,102.5
+roermond.boven,Roermond (upstream of stuw),Maas,175029,170784,102.5
+venlo,Venlo,Maas,175046,170784,102.5
+grave.beneden,Grave (downstream of stuw),Maas,174987,170784,102.5

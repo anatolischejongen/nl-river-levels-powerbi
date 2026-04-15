@@ -38,11 +38,11 @@ stations:
     region: Gelderland
     notes: Main Waal channel at Nijmegen
 
-  - code: tiel.waal
-    name: Tiel
-    river: Waal
-    region: Gelderland
-    notes: Waal at Tiel; tiel.sluis.waal stopped reporting Feb 2026
+  # - code: tiel.waal
+  #   name: Tiel
+  #   river: Waal
+  #   region: Gelderland
+  #   notes: Waal at Tiel; tiel.sluis.waal stopped reporting Feb 2026
 
   # ---------- IJssel (northern Rhine arm, flows to IJsselmeer) ----------
   - code: zutphen.ijssel
