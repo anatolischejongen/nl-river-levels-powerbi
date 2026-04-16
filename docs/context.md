@@ -51,23 +51,25 @@ dashboard — here's where Lobith surprised me."
    analysis without hitting the API, and provides a disaster-recovery 
    snapshot.
 
-## Selected stations (13 total, 5 rivers)
+## Selected stations (12 active, 5 rivers)
+
+Tiel (tiel.waal) was removed — JSONDecodeError for 2023–2025, only 2026 
+data available. Excluded from dim_station and all analysis.
 
 | # | Code | Name | River |
 |---|---|---|---|
 | 1 | `lobith.bovenrijn.tolkamer` | Lobith Tolkamer | Bovenrijn |
 | 2 | `arnhem.nederrijn` | Arnhem | Nederrijn |
 | 3 | `nijmegen.waal` | Nijmegen | Waal |
-| 4 | `tiel.waal` | Tiel | Waal |
-| 5 | `zutphen.ijssel` | Zutphen | IJssel |
-| 6 | `deventer` | Deventer | IJssel |
-| 7 | `olst` | Olst | IJssel |
-| 8 | `zwolle.ijssel` | Zwolle | IJssel |
-| 9 | `kampen.ijssel` | Kampen | IJssel |
-| 10 | `maastricht.borgharen.maas.beneden` | Borgharen | Maas |
-| 11 | `roermond.boven` | Roermond | Maas |
-| 12 | `venlo` | Venlo | Maas |
-| 13 | `grave.beneden` | Grave | Maas |
+| 4 | `zutphen.ijssel` | Zutphen | IJssel |
+| 5 | `deventer` | Deventer | IJssel |
+| 6 | `olst` | Olst | IJssel |
+| 7 | `zwolle.ijssel` | Zwolle | IJssel |
+| 8 | `kampen.ijssel` | Kampen | IJssel |
+| 9 | `maastricht.borgharen.maas.beneden` | Borgharen | Maas |
+| 10 | `roermond.boven` | Roermond | Maas |
+| 11 | `venlo` | Venlo | Maas |
+| 12 | `grave.beneden` | Grave | Maas |
 
 **Stations explicitly rejected and why**:
 - Rotterdam: tidal-dominated, would break the threshold analysis
@@ -75,6 +77,7 @@ dashboard — here's where Lobith surprised me."
 - `lobith.ponton`: water quality station, not water level (GROOTHEIDCODE 
   = CONCTTE, not WATHTE) — initial trap we discovered
 - Maastricht: geographically redundant with Borgharen (5 km apart)
+- Tiel: API returns JSONDecodeError for 2023–2025, only 2026 partial data
 
 ## Key discoveries (lessons-learned.md content)
 
@@ -125,29 +128,53 @@ Some stations report recent data but have gaps. The WFS catalogue
 last-measurement field tells you if a station is alive, but not 
 whether its time series is continuous. Must check both.
 
+### 7. Rijkswaterstaat sentinel value
+`value_cm = 999999999` means "no data" — not a real measurement. 
+Must be filtered to NULL before loading to Postgres. Discovered during 
+Phase 6 when NUMERIC(7,1) overflow error appeared.
+
+### 8. WMCN maatgevende meetpunten
+WMCN (Watermanagementcentrum Nederland) uses only two reference points 
+for national alarm color codes: **Lobith** (Rijn) and **Sint Pieter** 
+(Maas). All other stations are derived. Official thresholds only exist 
+for these two points. Sint Pieter and Borgharen are 5 km apart on the 
+same river with no weir between them — Sint Pieter thresholds apply 
+to Borgharen.
+
+Source: LDHO 2023 Bijlage D — 
+https://iplo.nl/publish/pages/225787/landelijk-draaiboek-hoogwater-en-overstromingsdreiging-ldho-2023.pdf
+
 ## Current file structure
+
+```
 nl-river-levels-powerbi/
-├── README.md                        # empty / minimal so far
-├── requirements.txt                 # requests, PyYAML, tqdm, pandas
-├── .gitignore                       # standard Python + data/raw/*
+├── README.md
+├── requirements.txt        # requests, PyYAML, tqdm, pandas, psycopg2-binary, python-dotenv
+├── .gitignore              # standard Python + data/raw/* + .env
+├── .env                    # DATABASE_URL — gitignored, must be recreated manually
 ├── docs/
-│   ├── ROADMAP.md                   # bilingual EN/NL, 15 phases
-│   └── session-context.md           # THIS FILE
+│   ├── ROADMAP.md
+│   └── session-context.md
 ├── data/
 │   ├── reference/
-│   │   └── stations.yaml            # 13 stations with metadata
-│   ├── raw/                         # gitignored
-│   │   └── water_levels_7days_2026-04-14.csv  # ~2 MB, 25123 rows
+│   │   └── stations.yaml   # 12 active stations (Tiel removed)
+│   ├── raw/                # gitignored
+│   │   ├── {station_code}_3y.csv   # 12 files, ~2.2M rows total
+│   │   └── historical_quality_report.csv
 │   └── sample/
-│       └── sample.csv               # 100 rows, committed
+│       └── sample.csv      # 100 rows, committed
 └── scripts/
-├── rws_api.py                   # shared module (API + parser)
-├── fetch_all_stations.py        # main ingestion script
-├── fetch_lobith_real.py         # sanity check, single station
-├── find_all_stations.py         # WFS catalogue search
-├── inspect_anomalies.py         # one-off diagnostic
-└── test_load_stations.py        # YAML loader validation
-
+    ├── rws_api.py               # shared module (API + parser)
+    ├── fetch_all_stations.py    # 7-day operational fetch
+    ├── fetch_historical.py      # 3-year historical fetch (2023–2026)
+    ├── seed_stations.py         # loads dim_station from YAML
+    ├── seed_dates.py            # generates + loads dim_date (2023–2026)
+    ├── load_measurements.py     # loads fact_measurements from CSVs
+    ├── fetch_lobith_real.py     # legacy sanity-check (can be deleted)
+    ├── find_all_stations.py     # WFS catalogue search
+    ├── inspect_anomalies.py     # one-off diagnostic
+    └── test_load_stations.py    # YAML loader validation
+```
 
 ## Module: rws_api.py
 
@@ -173,40 +200,103 @@ Four functions:
 **Compartiment**: always `OW` (oppervlaktewater)  
 **Grootheid**: always `WATHTE` (waterhoogte)
 
+## Supabase database
+
+**Project**: `nl-river-levels-powerbi`  
+**Host**: `db.hdapdtwkisfwgdxjohsp.supabase.co`  
+**Region**: West EU (Paris) — eu-west-3, t4g.nano  
+**Connection**: Session Pooler (IPv4 compatible)  
+**Pooler host**: `aws-0-eu-west-3.pooler.supabase.com:5432`  
+**User**: `postgres.hdapdtwkisfwgdxjohsp`
+
+### Star schema
+
+**`dim_station`** — 12 rows, seeded from stations.yaml  
+**`dim_date`** — 1,461 rows (2023-01-01 → 2026-12-31)  
+**`fact_measurements`** — 2,258,144 rows (meting + verwachting both loaded)
+
+```sql
+fact_measurements
+  id           BIGSERIAL PK
+  station_id   INTEGER FK → dim_station
+  date_id      INTEGER FK → dim_date  (YYYYMMDD format)
+  measured_at  TIMESTAMPTZ
+  value_cm     NUMERIC       -- sentinel 999999999 stored as NULL
+  proces_type  TEXT          -- 'meting' | 'verwachting'
+  hoedanigheid TEXT          -- 'NAP' (TAW filtered out at parse time)
+  quality_code SMALLINT
+  status       TEXT
+  UNIQUE (station_id, measured_at, proces_type)
+```
+
+## Power BI
+
+**Connection method**: ODBC via PostgreSQL Unicode(x64) driver  
+(Native PostgreSQL connector had SSL certificate incompatibility with Supabase pooler)
+
+**Model**: 3 tables loaded, relationships auto-detected correctly:
+- `dim_station` (1) → `fact_measurements` (*)
+- `dim_date` (1) → `fact_measurements` (*)
+
+### DAX Measures (all in fact_measurements table)
+
+```
+Avg Level (cm NAP)     — AVERAGE(value_cm) WHERE proces_type = "meting"
+Max Level (cm NAP)     — MAX(value_cm) WHERE proces_type = "meting"
+Total Measurements     — COUNTROWS WHERE proces_type = "meting"
+Days Above Geel        — DISTINCTCOUNT(date_id) WHERE value_cm >= threshold
+                         Lobith: 1200 cm | Borgharen: 4500 cm | others: BLANK()
+Days Above Oranje      — same pattern
+                         Lobith: 1500 cm | Borgharen: 4620 cm | others: BLANK()
+YoY Avg Level Delta    — current year avg minus previous year avg
+```
+
+### Official thresholds (LDHO 2023 Bijlage D)
+
+| Station | Geel | Oranje | Rood | Source |
+|---|---|---|---|---|
+| Lobith | 1200 (zomer) / 1300 (winter) cm | 1500 cm | 1650 cm | LDHO 2023 |
+| Borgharen | 4500 cm | 4620 cm | 4725 cm | LDHO 2023 Sint Pieter (5km upstream, same river) |
+| All others | — | — | — | No official meldpeilen available |
+
+### Key insight confirmed in data
+
+January 2024 flood event: Lobith reached 14.35m NAP — visible as a sharp 
+peak in the line chart. Documented in WMCN hoogwater reports and 
+Rijkswaterstaat news archives.
+
 ## Progress vs ROADMAP.md
 
 - ✅ Phase 0 — Repo skeleton
 - ✅ Phase 1 — API connection
-- ✅ Phase 1.5 — Station discovery and selection
+- ✅ Phase 1.5 — Station discovery and selection (12 stations, Tiel excluded)
 - ✅ Phase 2 — Multi-station fetch (rws_api module + fetch_all_stations.py)
-- ✅ Phase 3 — CSV intermediate layer (25,123 rows, 2 MB, verified)
-- ⬜ **Phase 4 — Scale to 3 years historical data** ← NEXT
-- ⬜ Phase 5 — Supabase / Postgres setup
-- ⬜ Phase 6 — CSV → Postgres loading
-- ⬜ Phase 7 — Power BI connection
-- ⬜ Phase 8 — DAX measures
-- ⬜ Phase 9 — Threshold research (riskiest phase, save Opus for this)
-- ⬜ Phases 10–12 — Dashboard pages
+- ✅ Phase 3 — CSV intermediate layer
+- ✅ Phase 4 — Historical data 2023–2026 (2.2M rows, 12 files)
+- ✅ Phase 5 — Supabase setup + star schema
+- ✅ Phase 6 — CSV → Postgres loading (2,258,144 rows)
+- ✅ Phase 7 — Power BI connection (via ODBC)
+- ✅ Phase 8 — DAX measures (6 measures)
+- ✅ Phase 9 — Threshold research (LDHO 2023, Lobith + Borgharen)
+- 🔵 **Phase 10 — Dashboard page 1: Overview** ← NEXT
+- ⬜ Phase 11 — Dashboard page 2: Trends
+- ⬜ Phase 12 — Dashboard page 3: Threshold Analysis
 - ⬜ Phase 13 — Documentation
-- ⬜ Phase 14 — Publish
+- ⬜ Phase 14 — Power BI Service publish
 - ⬜ Phase 15 — LinkedIn post
 
-## Phase 4 preview (what's next)
+## Phase 10 — next steps
 
-Scale from 7 days → 3 years.
+Overview page plan (agreed):
+1. **KPI cards** (top strip): Total Measurements, Active Stations (12), Days Above Geel (Lobith)
+2. **Map**: stations as bubbles, colored by river, sized by Avg Level
+   - ⚠️ dim_station has no lat/lon columns yet — need to add coordinates
+   - Power BI Map visual needs lat/lon or will try to geocode from name (unreliable)
+3. **Station table**: name, river, Avg Level, Max Level, Days Above Geel
+4. **River slicer**: filters map + table
 
-**Known risk**: Rijkswaterstaat API has a **160,000 measurements per 
-request** limit. One station × 3 years × 10-minute intervals ≈ 158,000 
-rows. Right at the edge. If we exceed the limit for any station, we 
-need **chunking by year** — split one 3-year request into three 1-year 
-requests and concatenate.
-
-**Likely approach**:
-1. Modify `fetch_all_stations.py` (or create `fetch_historical.py`) to 
-   accept a date range parameter instead of hardcoded 7 days
-2. Add chunking logic if a single request would exceed 160k
-3. Save per-station files: `data/raw/{station_code}_3y.csv`
-4. Produce a data quality report (missing days, gaps, total counts)
+**Pending decision**: Add lat/lon to dim_station before building the map visual.
+Known coordinates for all 12 stations available — Claude can provide them.
 
 ## Sam's learning style
 
@@ -230,12 +320,15 @@ requests and concatenate.
 - Co-creation: verify direction before producing work.
 - Pre-solution check: evaluate before proposing solutions.
 - Constructive critique when fundamental assumptions look problematic.
+- Code explanations always required: every snippet must explain what,
+  where, why — no ready-to-run scripts without understanding.
 
 ## Known limitations / TODOs
 
-
-- `fetch_lobith_real.py` is a legacy sanity-check; can be deleted once 
-  `fetch_all_stations.py` is battle-tested
-- `inspect_anomalies.py` is a one-off diagnostic; keep as reference
-- Threshold values (meldpeilen) still not located — biggest outstanding 
-  risk for Phase 9
+- `fetch_lobith_real.py` — legacy sanity-check, can be deleted
+- `inspect_anomalies.py` — one-off diagnostic, keep as reference
+- `dim_station` has no lat/lon — needed for Power BI map visual
+- Tiel excluded from analysis — only 2026 partial data available
+- Thresholds only available for Lobith and Borgharen — 10 other 
+  stations show BLANK() in threshold measures, documented as limitation
+- Supabase free tier — no backups, no branching

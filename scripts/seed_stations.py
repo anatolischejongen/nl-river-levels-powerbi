@@ -34,9 +34,6 @@ def seed(stations):
     conn = psycopg2.connect(DATABASE_URL)
     cur  = conn.cursor()
 
-    inserted = 0
-    skipped  = 0
-
     for s in stations:
         cur.execute("""
             INSERT INTO dim_station (code, name, river, region)
@@ -44,26 +41,17 @@ def seed(stations):
             ON CONFLICT (code) DO NOTHING
         """, (s["code"], s["name"], s["river"], s.get("region")))
 
-        # rowcount 0 ise bu satır zaten vardı (conflict)
-        if cur.rowcount == 1:
-            inserted += 1
-        else:
-            skipped += 1
-
     conn.commit()
+
+    cur.execute("SELECT COUNT(*) FROM dim_station")
+    count = cur.fetchone()[0]
+    print(f"dim_station → {count} rows in database")
+
     cur.close()
     conn.close()
-
-    print(f"dim_station → {inserted} inserted, {skipped} skipped")
 
 
 if __name__ == "__main__":
     stations = load_stations()
-    print(f"Loaded {len(stations)} stations from YAML\n")
-    
-    print("Stations to be inserted:")
-    for i, s in enumerate(stations, 1):
-        print(f"  {i:2d}. {s['code']:40s} | {s['name']:30s} | {s['river']}")
-    
-    print()
+    print(f"Loaded {len(stations)} stations from YAML")
     seed(stations)
