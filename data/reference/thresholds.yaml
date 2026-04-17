@@ -1,0 +1,126 @@
+# Grenswaarden per meetstation
+# Bron: waterinfo.rws.nl — gelezen op 17 april 2026
+# Eenheden: cm t.o.v. NAP
+# Niveaus: verlaagd, normaal_min, normaal_max, licht_verhoogd, verhoogd, hoogwater, extreem_hoogwater
+
+thresholds:
+
+  lobith.bovenrijn.tolkamer:
+    naam: "Lobith, Bovenrijn, Tolkamer"
+    verlaagd: 720
+    normaal_min: 720
+    normaal_max: 1200
+    licht_verhoogd: 1200
+    verhoogd: 1300
+    hoogwater: 1500
+    extreem_hoogwater: 1650
+
+  arnhem.nederrijn:
+    naam: "Arnhem, Nederrijn"
+    verlaagd: 695
+    normaal_min: 695
+    normaal_max: 995
+    licht_verhoogd: 995
+    verhoogd: 1080
+    hoogwater: 1225
+    extreem_hoogwater: 1320
+
+  nijmegen.waal:
+    naam: "Nijmegen, Waal"
+    verlaagd: 535
+    normaal_min: 535
+    normaal_max: 965
+    licht_verhoogd: 965
+    verhoogd: 1055
+    hoogwater: 1220
+    extreem_hoogwater: 1340
+
+  zutphen.ijssel:
+    naam: "Zutphen, IJssel"
+    verlaagd: 260
+    normaal_min: 260
+    normaal_max: 640
+    licht_verhoogd: 640
+    verhoogd: 695
+    hoogwater: 765
+    extreem_hoogwater: 820
+
+  deventer:
+    naam: "Deventer"
+    verlaagd: 150
+    normaal_min: 150
+    normaal_max: 480
+    licht_verhoogd: 480
+    verhoogd: 520
+    hoogwater: 610
+    extreem_hoogwater: 680
+
+  olst:
+    naam: "Olst"
+    verlaagd: 65
+    normaal_min: 65
+    normaal_max: 370
+    licht_verhoogd: 370
+    verhoogd: 420
+    hoogwater: 520
+    extreem_hoogwater: 585
+
+  zwolle.ijssel:
+    naam: "Zwolle, IJssel"
+    verlaagd: -15
+    normaal_min: -15
+    normaal_max: 155
+    licht_verhoogd: 155
+    verhoogd: 195
+    hoogwater: 280
+    extreem_hoogwater: 360
+
+  kampen.ijssel:
+    naam: "Kampen, IJssel"
+    verlaagd: -45
+    normaal_min: -45
+    normaal_max: 50
+    licht_verhoogd: 50
+    verhoogd: 70
+    hoogwater: 175
+    extreem_hoogwater: 260
+
+  maastricht.borgharen.maas.beneden:
+    naam: "Maastricht, Borgharen, Maas, beneden"
+    verlaagd: 3750
+    normaal_min: 3750
+    normaal_max: 4065
+    licht_verhoogd: 4065
+    verhoogd: 4170
+    hoogwater: 4325
+    extreem_hoogwater: 4425
+
+  roermond.boven:
+    naam: "Roermond, boven"
+    verlaagd: 1670
+    normaal_min: 1670
+    normaal_max: 1700
+    licht_verhoogd: 1700
+    verhoogd: 1730
+    hoogwater: 1900
+    extreem_hoogwater: 2020
+
+  venlo:
+    naam: "Venlo"
+    verlaagd: 1105
+    normaal_min: 1105
+    normaal_max: 1315
+    licht_verhoogd: 1315
+    verhoogd: 1440
+    hoogwater: 1640
+    extreem_hoogwater: 1765
+
+  grave.beneden:
+    naam: "Grave, beneden"
+    verlaagd: 460
+    normaal_min: 460
+    normaal_max: 645
+    licht_verhoogd: 645
+    verhoogd: 795
+    hoogwater: 900
+    extreem_hoogwater: 995
