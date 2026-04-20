@@ -8,6 +8,13 @@ Strategy:
 - ON CONFLICT DO NOTHING for idempotency
 - Verification: row count from database after each file
 
+Grootheid support:
+- Reads the 'grootheid' column from CSV when present (DEBIET, STROOMV files).
+- Falls back to 'WATHTE' when the column is absent (original _3y.csv files
+  produced before the grootheid column was added to the schema).
+- The ON CONFLICT target now includes grootheid so WATHTE and DEBIET rows
+  for the same station+timestamp can coexist.
+
 Usage:
     python scripts/load_measurements.py
 """
@@ -73,6 +80,7 @@ def csv_to_rows(
     Her satır için:
     - station_id: station_lookup'tan al
     - date_id: timestamp'ten YYYYMMDD integer üret, date_lookup'ta doğrula
+    - grootheid: CSV'de varsa kullan, yoksa 'WATHTE' default'u uygula
     - Diğer alanlar: olduğu gibi
 
     Döndürür:
@@ -88,6 +96,9 @@ def csv_to_rows(
     df["_ts"] = pd.to_datetime(df["timestamp"], utc=True)
     df["_date_id"] = df["_ts"].dt.strftime("%Y%m%d").astype(int)
 
+    # Eski _3y.csv dosyalarında 'grootheid' kolonu olmayabilir — 'WATHTE' default
+    has_grootheid_col = "grootheid" in df.columns
+
     rows = []
     skipped = 0
 
@@ -97,12 +108,15 @@ def csv_to_rows(
             skipped += 1
             continue
 
+        grootheid = row["grootheid"] if has_grootheid_col else "WATHTE"
+
         rows.append((
             station_id,
             date_id,
             row["_ts"].isoformat(),   # measured_at — TIMESTAMPTZ
             # Sentinel değeri filtrele: 999999999 = Rijkswaterstaat "no data" flag
             float(row["value_cm"]) if pd.notna(row["value_cm"]) and row["value_cm"] < 999999 else None,
+            grootheid,
             row["proces_type"],
             row["hoedanigheid"],
             int(row["quality_code"]) if pd.notna(row["quality_code"]) else None,
@@ -126,17 +140,23 @@ def insert_batches(cur, rows: list[tuple]) -> int:
         execute_values(cur, """
             INSERT INTO fact_measurements
                 (station_id, date_id, measured_at, value_cm,
-                 proces_type, hoedanigheid, quality_code, status)
+                 grootheid, proces_type, hoedanigheid, quality_code, status)
             VALUES %s
-            ON CONFLICT (station_id, measured_at, proces_type) DO NOTHING
+            ON CONFLICT (station_id, measured_at, proces_type, grootheid) DO NOTHING
         """, batch)
         total_inserted += len(batch)
     return total_inserted
 
 
 def load_file(path: Path, conn, station_lookup, date_lookup):
-    """Tek bir _3y.csv dosyasını yükle."""
-    station_code = path.stem.replace("_3y", "")
+    """Tek bir CSV dosyasını yükle."""
+    # _debiet_3y, _stroomv_3y, _3y suffix'lerini temizle
+    station_code = path.stem
+    for suffix in ("_debiet_3y", "_stroomv_3y", "_3y"):
+        if station_code.endswith(suffix):
+            station_code = station_code[: -len(suffix)]
+            break
+
     print(f"→ {station_code}")
 
     df = pd.read_csv(path)
@@ -155,7 +175,7 @@ def load_file(path: Path, conn, station_lookup, date_lookup):
     insert_batches(cur, rows)
     conn.commit()
 
-    # Prensip 1 & 3: gerçek sayıyı veritabanından al
+    # Gerçek sayıyı veritabanından al
     cur.execute(
         "SELECT COUNT(*) FROM fact_measurements WHERE station_id = %s",
         (station_lookup[station_code],)
@@ -171,7 +191,7 @@ def main():
     print(f"Found {len(csv_files)} CSV files in {RAW_DIR}\n")
 
     if not csv_files:
-        print("✗ No _3y.csv files found. Run fetch_historical.py first.")
+        print("✗ No _3y.csv files found. Run fetch_historical.py / fetch_hydraulics.py first.")
         return
 
     conn = psycopg2.connect(DATABASE_URL)
@@ -184,13 +204,13 @@ def main():
 
     # Final verification
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM fact_measurements")
-    total = cur.fetchone()[0]
+    cur.execute("SELECT grootheid, COUNT(*) FROM fact_measurements GROUP BY grootheid ORDER BY grootheid")
+    print("=" * 50)
+    print("ROWS IN fact_measurements BY GROOTHEID:")
+    for grootheid, count in cur.fetchall():
+        print(f"  {grootheid:<10} {count:>12,}")
     cur.close()
     conn.close()
-
-    print("=" * 50)
-    print(f"TOTAL rows in fact_measurements: {total:,}")
     print("=" * 50)
 
 

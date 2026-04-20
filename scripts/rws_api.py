@@ -1,8 +1,12 @@
 """
 rws_api.py — Rijkswaterstaat WaterWebservices API client.
 
-Reusable functions for fetching and parsing water level (WATHTE) data
+Reusable functions for fetching and parsing measurement data
 from Rijkswaterstaat's OphalenWaarnemingen endpoint.
+
+Supports any Grootheid code (WATHTE, DEBIET, STROOMV, …) via the
+`grootheid` parameter. All functions default to "WATHTE" so existing
+callers continue to work without changes.
 
 This module is imported by other scripts; it is not meant to be run directly.
 """
@@ -23,8 +27,8 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.000+00:00"
 # Default request timeout in seconds
 DEFAULT_TIMEOUT = 30
 
-# Helper function to build the request body for a given station and time range
-def build_request_body(station_code, start_time, end_time):
+
+def build_request_body(station_code, start_time, end_time, grootheid="WATHTE"):
     """
     Build the POST request body for OphalenWaarnemingen.
 
@@ -36,6 +40,9 @@ def build_request_body(station_code, start_time, end_time):
         Start of the requested period (timezone-aware UTC)
     end_time : datetime
         End of the requested period (timezone-aware UTC)
+    grootheid : str, optional
+        Aquo grootheid code to request (default: "WATHTE").
+        Other valid values: "DEBIET", "STROOMV".
 
     Returns
     -------
@@ -49,7 +56,7 @@ def build_request_body(station_code, start_time, end_time):
         "AquoPlusWaarnemingMetadata": {
             "AquoMetadata": {
                 "Compartiment": {"Code": "OW"},
-                "Grootheid": {"Code": "WATHTE"}
+                "Grootheid": {"Code": grootheid}
             }
         },
         "Periode": {
@@ -58,10 +65,11 @@ def build_request_body(station_code, start_time, end_time):
         }
     }
 
-# Main function to fetch data for a single station and time range
-def fetch_station_data(station_code, start_time, end_time, timeout=DEFAULT_TIMEOUT):
+
+def fetch_station_data(station_code, start_time, end_time,
+                       grootheid="WATHTE", timeout=DEFAULT_TIMEOUT):
     """
-    Fetch raw water level data for a single station from Rijkswaterstaat.
+    Fetch measurement data for a single station from Rijkswaterstaat.
 
     Parameters
     ----------
@@ -71,6 +79,9 @@ def fetch_station_data(station_code, start_time, end_time, timeout=DEFAULT_TIMEO
         Start of the requested period (timezone-aware UTC)
     end_time : datetime
         End of the requested period (timezone-aware UTC)
+    grootheid : str, optional
+        Aquo grootheid code to request (default: "WATHTE").
+        Other valid values: "DEBIET", "STROOMV".
     timeout : int, optional
         Request timeout in seconds (default: 30)
 
@@ -86,15 +97,16 @@ def fetch_station_data(station_code, start_time, end_time, timeout=DEFAULT_TIMEO
     requests.RequestException
         For network errors, timeouts, etc.
     """
-    body = build_request_body(station_code, start_time, end_time)
-    
+    body = build_request_body(station_code, start_time, end_time, grootheid)
+
     response = requests.post(API_URL, json=body, timeout=timeout)
     response.raise_for_status()
-    
+
     return response.json()
 
-# Helper function to parse the API response into flat rows for easier analysis
-def parse_response_to_rows(response_json, station_code, accepted_hoedanigheid=("NAP",)):
+
+def parse_response_to_rows(response_json, station_code, grootheid="WATHTE",
+                           accepted_hoedanigheid=("NAP",)):
     """
     Convert Rijkswaterstaat OphalenWaarnemingen JSON response to flat rows.
 
@@ -107,6 +119,12 @@ def parse_response_to_rows(response_json, station_code, accepted_hoedanigheid=("
     stations like Borgharen — these are valid but belong to a different
     national reference system.
 
+    Note on `grootheid` vs `accepted_hoedanigheid`: grootheid identifies the
+    physical quantity being measured (water level, discharge, flow velocity).
+    Hoedanigheid identifies the reference datum or unit convention (NAP, TAW).
+    For DEBIET and STROOMV the hoedanigheid filter is typically not relevant,
+    but is kept consistent with the WATHTE implementation.
+
     Parameters
     ----------
     response_json : dict
@@ -114,6 +132,9 @@ def parse_response_to_rows(response_json, station_code, accepted_hoedanigheid=("
     station_code : str
         Station code to attach to each row (provided externally to ensure
         consistent labeling across the dataset)
+    grootheid : str, optional
+        Grootheid code to tag on each output row (default: "WATHTE").
+        Must match what was requested in `fetch_station_data()`.
     accepted_hoedanigheid : tuple of str, optional
         Which Hoedanigheid (reference datum) codes to accept.
         Default: ("NAP",) — only Dutch Normaal Amsterdams Peil.
@@ -122,45 +143,46 @@ def parse_response_to_rows(response_json, station_code, accepted_hoedanigheid=("
     Returns
     -------
     list of dict
-        Each row contains: station_code, timestamp, value_cm, proces_type,
-        hoedanigheid, quality_code, status.
+        Each row contains: station_code, timestamp, value_cm, grootheid,
+        proces_type, hoedanigheid, quality_code, status.
         Empty list if no data was found.
     """
     rows = []
-    
+
     waarnemingen_lijst = response_json.get("WaarnemingenLijst", [])
-    
+
     for entry in waarnemingen_lijst:
         aquo = entry.get("AquoMetadata", {})
         proces_type = aquo.get("ProcesType", "meting")
         hoedanigheid = aquo.get("Hoedanigheid", {}).get("Code", "?")
-        
+
         # Skip entries with unwanted reference datum (e.g. Belgian TAW)
         if hoedanigheid not in accepted_hoedanigheid:
             continue
-        
+
         metingen_lijst = entry.get("MetingenLijst", [])
-        
+
         for meting in metingen_lijst:
             value = meting.get("Meetwaarde", {}).get("Waarde_Numeriek")
             timestamp = meting.get("Tijdstip")
             quality_code = meting.get("WaarnemingMetadata", {}).get("Kwaliteitswaardecode")
             status = meting.get("WaarnemingMetadata", {}).get("Statuswaarde")
-            
+
             row = {
                 "station_code": station_code,
-                "timestamp": timestamp,
-                "value_cm": value,
-                "proces_type": proces_type,
+                "timestamp":    timestamp,
+                "value_cm":     value,
+                "grootheid":    grootheid,
+                "proces_type":  proces_type,
                 "hoedanigheid": hoedanigheid,
                 "quality_code": quality_code,
-                "status": status,
+                "status":       status,
             }
             rows.append(row)
-    
+
     return rows
 
-# Convenience helper to get a default time range (last N days) in UTC
+
 def get_default_time_range(days=7):
     """
     Return a default UTC time range ending now.
