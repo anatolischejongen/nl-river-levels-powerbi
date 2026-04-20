@@ -1,11 +1,12 @@
 """
-discover_grootheids.py — Query the Wadar metadata API to find which
-grootheids (WATHTE, DEBIET, STROOMV, …) are available at each of our
-12 active stations.
+discover_grootheids.py — Find which of our 12 stations publish DEBIET/STROOMV.
 
-The WFS catalogue (locatiesmetlaatstewaarneming) only lists WATHTE stations.
-This script uses OphalenCatalogus — the Wadar metadata service — which
-returns all available measurement types per station directly from the API.
+Strategy: call OphalenWaarnemingen directly with each grootheid for a short
+7-day window. If the response contains actual measurements, the station
+publishes that grootheid. Empty WaarnemingenLijst or HTTP error → not available.
+
+This is more reliable than metadata endpoints, which have stricter request
+format requirements not documented publicly for the new Wadar service.
 
 Usage:
     python scripts/discover_grootheids.py
@@ -15,20 +16,25 @@ import time
 import yaml
 import requests
 from pathlib import Path
+from datetime import datetime, timedelta, UTC
 
 # ── Paths ─────────────────────────────────────────────────────────────
 SCRIPT_DIR    = Path(__file__).parent
 STATIONS_FILE = SCRIPT_DIR.parent / "data" / "reference" / "stations.yaml"
 
-CATALOGUE_URL = (
+API_URL = (
     "https://ddapi20-waterwebservices.rijkswaterstaat.nl"
-    "/METADATASERVICES/OphalenCatalogus"
+    "/ONLINEWAARNEMINGENSERVICES/OphalenWaarnemingen"
 )
-
-REQUEST_DELAY = 0.5
+TIME_FORMAT   = "%Y-%m-%dT%H:%M:%S.000+00:00"
+REQUEST_DELAY = 0.8
 DEFAULT_TIMEOUT = 30
 
-TARGET_GROOTHEDEN = {"DEBIET", "STROOMV", "WATHTE"}
+CHECK_GROOTHEDEN = ["DEBIET", "STROOMV"]
+
+# Short recent window — enough to confirm availability without pulling much data
+END_TIME   = datetime.now(UTC)
+START_TIME = END_TIME - timedelta(days=7)
 
 
 def load_stations(yaml_path):
@@ -37,54 +43,65 @@ def load_stations(yaml_path):
     return config.get("stations", [])
 
 
-def fetch_catalogue(station_code):
+def has_data(station_code, grootheid):
     """
-    Ask the Wadar metadata API what measurements are available at a station.
+    Return True if the station publishes at least one measurement for this
+    grootheid in the last 7 days.
 
-    Returns a list of grootheid codes, or an empty list on error.
+    Calls OphalenWaarnemingen and checks whether WaarnemingenLijst is
+    non-empty and contains at least one MetingenLijst entry with data.
+    Any HTTP error (including 400) is treated as 'not available'.
     """
-    body = {"Locatie": {"Code": station_code}}
+    body = {
+        "Locatie": {"Code": station_code},
+        "AquoPlusWaarnemingMetadata": {
+            "AquoMetadata": {
+                "Compartiment": {"Code": "OW"},
+                "Grootheid":    {"Code": grootheid},
+            }
+        },
+        "Periode": {
+            "Begindatumtijd": START_TIME.strftime(TIME_FORMAT),
+            "Einddatumtijd":  END_TIME.strftime(TIME_FORMAT),
+        },
+    }
     try:
-        response = requests.post(CATALOGUE_URL, json=body, timeout=DEFAULT_TIMEOUT)
-        response.raise_for_status()
-        data = response.json()
-        # Response structure: AquoMetadataLijst → each entry has Grootheid.Code
-        return [
-            entry.get("Grootheid", {}).get("Code", "?")
-            for entry in data.get("AquoMetadataLijst", [])
-        ]
-    except Exception as e:
-        print(f"  ⚠ {station_code}: {type(e).__name__}: {e}")
-        return []
+        r = requests.post(API_URL, json=body, timeout=DEFAULT_TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        for entry in data.get("WaarnemingenLijst", []):
+            if entry.get("MetingenLijst"):
+                return True
+        return False
+    except Exception:
+        return False
 
 
 def main():
     stations = load_stations(STATIONS_FILE)
-    print(f"Querying OphalenCatalogus for {len(stations)} stations...\n")
+    print(f"Probing {len(stations)} stations × {len(CHECK_GROOTHEDEN)} grootheids "
+          f"via OphalenWaarnemingen (last 7 days)...\n")
 
-    debiet_stations  = []
-    stroomv_stations = []
+    results = {g: [] for g in CHECK_GROOTHEDEN}
 
-    print(f"{'Station code':<45} {'Available grootheids'}")
-    print("-" * 75)
+    header = f"{'Station code':<45}" + "".join(f"{g:^10}" for g in CHECK_GROOTHEDEN)
+    print(header)
+    print("-" * len(header))
 
     for s in stations:
         code = s["code"]
-        grootheids = fetch_catalogue(code)
-        interesting = [g for g in grootheids if g in TARGET_GROOTHEDEN]
-        all_str = ", ".join(sorted(grootheids)) if grootheids else "—"
-        print(f"  {code:<43} {all_str}")
+        row  = f"  {code:<43}"
+        for grootheid in CHECK_GROOTHEDEN:
+            found = has_data(code, grootheid)
+            row  += f"{'✅':^10}" if found else f"{'—':^10}"
+            if found:
+                results[grootheid].append(code)
+            time.sleep(REQUEST_DELAY)
+        print(row)
 
-        if "DEBIET"  in grootheids:
-            debiet_stations.append(code)
-        if "STROOMV" in grootheids:
-            stroomv_stations.append(code)
-
-        time.sleep(REQUEST_DELAY)
-
-    print("\n" + "=" * 75)
-    print(f"DEBIET_STATIONS  = {debiet_stations}")
-    print(f"STROOMV_STATIONS = {stroomv_stations}")
+    print("\n" + "=" * 65)
+    for grootheid in CHECK_GROOTHEDEN:
+        print(f"{grootheid}_STATIONS  = {results[grootheid]}")
     print("\nPaste these lists into fetch_hydraulics.py")
 
 
