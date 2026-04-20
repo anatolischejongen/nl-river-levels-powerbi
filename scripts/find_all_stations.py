@@ -145,38 +145,48 @@ for target, matches in results.items():
         print(f"  {active_marker} {s['code']:35s} | {s['name']:40s} | last: {s['last_time']}")
 
 
-# ── Section 2: HYDRAULICS CHECK — our 12 stations vs DEBIET / STROOMV ─
+# ── Section 2: HYDRAULICS NAME SEARCH — DEBIET and STROOMV by location ─
+#
+# DEBIET / STROOMV stations often have DIFFERENT codes from WATHTE stations
+# at the same physical location (e.g. lobith.bovenrijn.tolkamer for WATHTE
+# but lobith.debiet or just lobith for DEBIET). Exact-code matching would
+# always return empty. Instead we search by the same TARGET_NAMES across
+# each grootheid's station list — same approach as Section 1.
 
 print("\n\n" + "=" * 70)
-print("HYDRAULICS AVAILABILITY CHECK")
-print("Cross-reference: stations.yaml codes vs DEBIET and STROOMV")
+print("HYDRAULICS NAME SEARCH  (DEBIET and STROOMV)")
+print("Same TARGET_NAMES searched across each grootheid's catalogue")
 print("=" * 70)
 
-active_codes = load_active_station_codes(STATIONS_FILE)
+for grootheid in ["DEBIET", "STROOMV"]:
+    stations = stations_by_grootheid[grootheid]
+    print(f"\n{'─' * 70}")
+    print(f"  {grootheid}  ({len(stations)} stations in catalogue)")
+    print(f"{'─' * 70}")
 
-# Build a lookup: code → set of available grootheids
-available = {code: set() for code in active_codes}
-for grootheid, stations in stations_by_grootheid.items():
-    catalogue_codes = {s["code"] for s in stations}
-    for code in active_codes:
-        if code in catalogue_codes:
-            available[code].add(grootheid)
+    any_found = False
+    for target in TARGET_NAMES:
+        matches = []
+        for station in stations:
+            name = (station["name"] or "").lower()
+            code = (station["code"] or "").lower()
+            if target in name or target in code:
+                matches.append(station)
 
-# Print result table
-print(f"\n{'Station code':<45} {'WATHTE':^8} {'DEBIET':^8} {'STROOMV':^8}")
-print("-" * 73)
-for code in active_codes:
-    g = available[code]
-    w = "✅" if "WATHTE"  in g else "—"
-    d = "✅" if "DEBIET"  in g else "—"
-    s = "✅" if "STROOMV" in g else "—"
-    print(f"  {code:<43} {w:^8} {d:^8} {s:^8}")
+        if not matches:
+            continue
 
-# Summary: which stations to target in fetch_hydraulics.py
-debiet_codes  = [c for c in active_codes if "DEBIET"  in available[c]]
-stroomv_codes = [c for c in active_codes if "STROOMV" in available[c]]
+        any_found = True
+        matches.sort(key=lambda s: (not is_recent(s), s.get("code", "")))
+        print(f"\n  --- {target.upper()} ---")
+        for s in matches:
+            active_marker = "🟢" if is_recent(s) else "⚪"
+            print(f"  {active_marker} {s['code']:40s} | {s['name']:35s} | last: {s['last_time']}")
 
-print(f"\n→ {len(debiet_codes)} station(s) with DEBIET:  {debiet_codes}")
-print(f"→ {len(stroomv_codes)} station(s) with STROOMV: {stroomv_codes}")
-print("\nUpdate DEBIET_STATIONS / STROOMV_STATIONS in fetch_hydraulics.py"
-      " with the lists above before running it.")
+    if not any_found:
+        print(f"\n  ❌ No matches for any TARGET_NAME under {grootheid}")
+
+print("\n\nNext step:")
+print("  Copy the 🟢 codes above into fetch_hydraulics.py:")
+print("    DEBIET_STATIONS  = [...]")
+print("    STROOMV_STATIONS = [...]")
