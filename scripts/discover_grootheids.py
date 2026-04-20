@@ -30,7 +30,9 @@ TIME_FORMAT   = "%Y-%m-%dT%H:%M:%S.000+00:00"
 REQUEST_DELAY = 0.8
 DEFAULT_TIMEOUT = 30
 
-CHECK_GROOTHEDEN = ["DEBIET", "STROOMV"]
+# "Q" is the Aquo standard code for discharge (debiet). "DEBIET" is not
+# a valid grootheid code in this API — confirmed via WFS catalogue inspection.
+CHECK_GROOTHEDEN = ["Q"]
 
 # Short recent window — enough to confirm availability without pulling much data
 END_TIME   = datetime.now(UTC)
@@ -102,7 +104,8 @@ def main():
     print("\n" + "=" * 65)
     for grootheid in CHECK_GROOTHEDEN:
         print(f"{grootheid}_STATIONS  = {results[grootheid]}")
-    print("\nPaste these lists into fetch_hydraulics.py")
+    print("\nNote: Q = debiet (discharge, m³/s). Hoedanigheid = NVT.")
+    print("These codes are already filled in fetch_hydraulics.py.")
 
 
 if __name__ == "__main__":
