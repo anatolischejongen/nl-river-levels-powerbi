@@ -42,7 +42,7 @@ def build_request_body(station_code, start_time, end_time, grootheid="WATHTE"):
         End of the requested period (timezone-aware UTC)
     grootheid : str, optional
         Aquo grootheid code to request (default: "WATHTE").
-        Other valid values: "DEBIET", "STROOMV".
+        Use "Q" for discharge (debiet, m³/s) — "DEBIET" is not a valid code.
 
     Returns
     -------
@@ -81,7 +81,7 @@ def fetch_station_data(station_code, start_time, end_time,
         End of the requested period (timezone-aware UTC)
     grootheid : str, optional
         Aquo grootheid code to request (default: "WATHTE").
-        Other valid values: "DEBIET", "STROOMV".
+        Use "Q" for discharge (debiet, m³/s) — "DEBIET" is not a valid code.
     timeout : int, optional
         Request timeout in seconds (default: 30)
 
@@ -122,8 +122,8 @@ def parse_response_to_rows(response_json, station_code, grootheid="WATHTE",
     Note on `grootheid` vs `accepted_hoedanigheid`: grootheid identifies the
     physical quantity being measured (water level, discharge, flow velocity).
     Hoedanigheid identifies the reference datum or unit convention (NAP, TAW).
-    For DEBIET and STROOMV the hoedanigheid filter is typically not relevant,
-    but is kept consistent with the WATHTE implementation.
+    For Q (discharge) use accepted_hoedanigheid=("NVT",) — Q measurements
+    carry no reference datum (NVT = Niet Van Toepassing).
 
     Parameters
     ----------
